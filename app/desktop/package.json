@@ -1,0 +1,64 @@
+{
+  "name": "@teachmate/desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TeachMate 桌面客户端壳与跨平台打包配置",
+  "type": "module",
+  "main": "main.mjs",
+  "scripts": {
+    "build": "node scripts/check-build.mjs",
+    "dev": "electron .",
+    "dist": "pnpm run build && electron-builder"
+  },
+  "dependencies": {
+    "@teachmate/agent-engine": "workspace:*",
+    "@teachmate/server": "workspace:*"
+  },
+  "devDependencies": {
+    "electron": "^36.5.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.teachmate.desktop",
+    "productName": "TeachMate",
+    "asar": true,
+    "files": [
+      "main.mjs",
+      "preload.mjs",
+      "bin/**/*",
+      "config.example.env",
+      "package.json",
+      "../server/dist/**/*",
+      "../agent-engine/dist/**/*",
+      "../server/package.json",
+      "../agent-engine/package.json",
+      "../node_modules/**/*"
+    ],
+    "extraResources": [
+      { "from": "../web/dist", "to": "web-dist" },
+      { "from": "../../knowledge-base", "to": "knowledge-base" },
+      { "from": "bin", "to": "bin" }
+    ],
+    "directories": {
+      "output": "../../release"
+    },
+    "win": {
+      "target": ["nsis", "portable"],
+      "artifactName": "TeachMate-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "mac": {
+      "target": ["dmg", "zip"],
+      "category": "public.app-category.education"
+    },
+    "linux": {
+      "target": ["AppImage", "zip"],
+      "category": "Education"
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "teachmate-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TeachMate 智能作业批改系统全栈工程",
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev": "pnpm -r --parallel dev",
+    "dev:server": "pnpm --filter @teachmate/server dev",
+    "dev:web": "pnpm --filter @teachmate/web dev",
+    "dev:files": "pnpm --filter @teachmate/file-server dev",
+    "desktop:dev": "pnpm --filter @teachmate/desktop dev",
+    "desktop:package": "pnpm build && pnpm --filter @teachmate/desktop dist",
+    "desktop:package:dir": "pnpm build && pnpm --filter @teachmate/desktop exec electron-builder --dir",
+    "test": "pnpm -r test",
+    "eval": "pnpm --filter @teachmate/eval run eval"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "typescript": "^5.7.3"
+  }
+}

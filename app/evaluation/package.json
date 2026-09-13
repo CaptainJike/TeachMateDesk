@@ -1,0 +1,17 @@
+{
+  "name": "@teachmate/eval",
+  "version": "1.0.0",
+  "description": "TeachMate 标准基准评测集与自动化评测体系",
+  "type": "module",
+  "scripts": {
+    "eval": "tsx run-eval.ts"
+  },
+  "dependencies": {
+    "@teachmate/agent-engine": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

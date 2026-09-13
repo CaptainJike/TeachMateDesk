@@ -1,0 +1,14 @@
+packages:
+  - 'agent-engine'
+  - 'server'
+  - 'web'
+  - 'evaluation'
+  - 'file-server'
+  - 'desktop'
+allowBuilds:
+  '@google/genai': true
+  better-sqlite3: true
+  electron: true
+  electron-winstaller: true
+  esbuild: true
+  protobufjs: true

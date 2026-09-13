@@ -1,0 +1,34 @@
+# Local agent/runtime state
+.pi/
+.pnpm-store/
+
+# JavaScript dependencies and generated output
+node_modules/
+**/node_modules/
+**/dist/
+**/coverage/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Runtime data, uploads, logs and backups
+app/data/
+app/logs/
+app/file-server/uploads/*
+!app/file-server/uploads/.gitkeep
+data/
+file-server/uploads/
+artifacts/
+release/
+*.sqlite
+*.db
+*.bak
+*.bak.*
+*.log
+
+# OS/editor files
+.DS_Store
+.idea/
+.vscode/*.local.json

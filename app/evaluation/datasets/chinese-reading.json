@@ -1,0 +1,66 @@
+[
+  {
+    "id": "eval_01",
+    "type": "single_choice",
+    "stem": "下列词语中加点字注音全部正确的一项是 ( )",
+    "max_score": 3,
+    "reference_answer": "A",
+    "student_answer": "A",
+    "expert_score": 3
+  },
+  {
+    "id": "eval_02",
+    "type": "single_choice",
+    "stem": "下列词语中加点字注音全部正确的一项是 ( )",
+    "max_score": 3,
+    "reference_answer": "A",
+    "student_answer": "C",
+    "expert_score": 0
+  },
+  {
+    "id": "eval_03",
+    "type": "subjective_short",
+    "stem": "简析杜牧《赤壁》中后两句‘东风不与周郎便，铜雀春深锁二乔’的艺术构思与主旨情感。(4分)",
+    "max_score": 4,
+    "reference_answer": "运用以小见大、借古讽今的手法，借由赤壁之战东风的侥幸胜利，深刻抒发了作者自己怀才不遇、英雄无用武之地的抑郁不平之气。",
+    "rubric_steps": [
+      {
+        "step_no": 1,
+        "score": 2,
+        "criteria": "准确指出以小见大或反跌设想手法",
+        "keywords": ["以小见大", "借古讽今", "手法", "设想"]
+      },
+      {
+        "step_no": 2,
+        "score": 2,
+        "criteria": "深入分析抒发了诗人怀才不遇、英雄失意的抑郁情感",
+        "keywords": ["怀才不遇", "抑郁", "英雄失意", "壮志难酬"]
+      }
+    ],
+    "student_answer": "这两句诗运用了以小见大的手法，借赤壁之战抒发了诗人自己怀才不遇的抑郁之情。",
+    "expert_score": 4
+  },
+  {
+    "id": "eval_04",
+    "type": "subjective_short",
+    "stem": "简析杜牧《赤壁》中后两句‘东风不与周郎便，铜雀春深锁二乔’的艺术构思与主旨情感。(4分)",
+    "max_score": 4,
+    "reference_answer": "运用以小见大手法，抒发怀才不遇之情。",
+    "rubric_steps": [
+      {
+        "step_no": 1,
+        "score": 2,
+        "criteria": "准确指出以小见大或反跌假设手法",
+        "keywords": ["以小见大", "借古讽今", "东风", "铜雀台", "偶然"]
+      },
+      {
+        "step_no": 2,
+        "score": 2,
+        "criteria": "深入分析怀才不遇情感",
+        "keywords": ["怀才不遇", "抑郁", "壮志难酬"]
+      }
+    ],
+    "student_answer": "后两句写如果东风不来，二乔就会被锁在铜雀台，写历史偶然性。",
+    "expert_score": 2
+  }
+]

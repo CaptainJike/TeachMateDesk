@@ -1,0 +1,14 @@
+{
+  "name": "@teachmate/file-server",
+  "version": "1.0.0",
+  "description": "TeachMate 本地静态文件映射与传输服务 (用于 PaddleX / OCR 服务免 Base64 URL 传输)",
+  "main": "server.mjs",
+  "type": "module",
+  "scripts": {
+    "dev": "node server.mjs",
+    "start": "node server.mjs"
+  },
+  "keywords": ["file-server", "static", "teachmate", "ocr"],
+  "author": "TeachMate Team",
+  "license": "MIT"
+}
