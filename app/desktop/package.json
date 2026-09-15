@@ -43,6 +43,7 @@
       "output": "../../release"
     },
     "win": {
+      "icon": "assets/icon.ico",
       "target": ["nsis", "portable"],
       "artifactName": "TeachMate-${version}-${arch}.${ext}"
     },
@@ -53,6 +54,7 @@
       "createStartMenuShortcut": true
     },
     "mac": {
+      "icon": "assets/icon.icns",
       "target": ["dmg", "zip"],
       "category": "public.app-category.education"
     },
