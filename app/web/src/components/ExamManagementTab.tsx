@@ -20,8 +20,9 @@ import {
   Clock,
   ArrowUp,
   ArrowDown,
+  RefreshCw,
 } from "lucide-react";
-import type { ExamPaper } from "../types.js";
+import type { ExamPaper, ScoreSummary } from "../types.js";
 
 interface ExamManagementTabProps {
   exams: ExamPaper[];
@@ -89,11 +90,15 @@ export const ExamManagementTab: React.FC<ExamManagementTabProps> = ({
   const [uploadTitle, setUploadTitle] = useState("");
   const [uploadText, setUploadText] = useState("");
   const [expectedQuestionCount, setExpectedQuestionCount] = useState("");
-  const [expectedTotalScore, setExpectedTotalScore] = useState("");
+  const [expectedTotalScore, setExpectedTotalScore] = useState("100");
   const [isParsing, setIsParsing] = useState(false);
   const [modalVisionStep, setModalVisionStep] = useState("");
   const [modalVisionError, setModalVisionError] = useState("");
   const modalFileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // 导入完成后的自动配分结果提示（方案 29）
+  const [scoreNotice, setScoreNotice] = useState<{ exam: ExamPaper } | null>(null);
+  const [reassigningExamId, setReassigningExamId] = useState<string | null>(null);
 
   const updateSemesterForGrade = (grade: GradeOption, currentSemester: string) => {
     const volume = currentSemester.endsWith("下册") ? "下册" : "上册";
@@ -162,6 +167,7 @@ export const ExamManagementTab: React.FC<ExamManagementTabProps> = ({
       formData.append("edition_year", modalEditionYear.trim());
       formData.append("semester", modalSemester);
       formData.append("expected_question_count", expectedQuestionCount.trim());
+      formData.append("total_score", expectedTotalScore.trim());
       formData.append("expected_total_score", expectedTotalScore.trim());
 
       setModalVisionStep(`Pi Agent 正在按页面顺序分析 ${modalVisionFiles.length} 个文件，并合并为一套试卷...`);
@@ -180,10 +186,11 @@ export const ExamManagementTab: React.FC<ExamManagementTabProps> = ({
       setShowUploadModal(false);
       setModalVisionFiles([]);
       setExpectedQuestionCount("");
-      setExpectedTotalScore("");
+      setExpectedTotalScore("100");
       onRefreshExams();
       if (data.exam) {
         onSelectExam(data.exam);
+        setScoreNotice({ exam: data.exam });
       }
     } catch (err: any) {
       setModalVisionStep("");
@@ -214,6 +221,7 @@ export const ExamManagementTab: React.FC<ExamManagementTabProps> = ({
           publisher: modalPublisher,
           edition_year: modalEditionYear,
           semester: modalSemester,
+          totalScore: Number(expectedTotalScore) > 0 ? Number(expectedTotalScore) : undefined,
         }),
       });
 
@@ -227,8 +235,10 @@ export const ExamManagementTab: React.FC<ExamManagementTabProps> = ({
       setShowUploadModal(false);
       setUploadText("");
       setUploadTitle("");
+      setExpectedTotalScore("100");
       onRefreshExams();
       onSelectExam(exam);
+      setScoreNotice({ exam });
     } catch (err: any) {
       setModalVisionStep("");
       setModalVisionError(err.message || "试卷解析创建异常");
@@ -376,8 +386,94 @@ export const ExamManagementTab: React.FC<ExamManagementTabProps> = ({
     }
   };
 
+  // 重新自动配分（方案 25 / 27）；mode=full 表示仅保留人工分值
+  const handleReassignScore = async (exam: ExamPaper, mode: "keep-manual" | "full" = "keep-manual") => {
+    setReassigningExamId(exam.id);
+    try {
+      const res = await fetch(`/api/exams/${exam.id}/reassign-score`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode,
+          totalScore: exam.score_summary?.configuredTotalScore || exam.total_score || 100,
+        }),
+      });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || "重新自动配分失败");
+      }
+      const updated: ExamPaper = await res.json();
+      onRefreshExams();
+      if (selectedExam?.id === updated.id) onSelectExam(updated);
+      setScoreNotice({ exam: updated });
+    } catch (e: any) {
+      alert(e.message || "重新自动配分发生异常");
+    } finally {
+      setReassigningExamId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* 导入后的自动配分结果提示（方案 29） */}
+      {scoreNotice && (
+        <div className="bg-white rounded-2xl p-4 border border-emerald-200 shadow-sm space-y-2.5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2.5">
+              <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-bold text-slate-900">
+                  {scoreNotice.exam.score_summary?.conflict
+                    ? "试卷已导入：原卷分值合计超过设置总分"
+                    : "已自动完成试卷配分"}
+                  <span className="ml-2 text-xs font-medium text-slate-500">{scoreNotice.exam.title}</span>
+                </p>
+                {scoreNotice.exam.score_summary ? (
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
+                    <span>试卷总分：<b className="text-slate-900">{scoreNotice.exam.score_summary.totalScore} 分</b></span>
+                    <span>识别原有分值：<b className="text-slate-900">{scoreNotice.exam.score_summary.fixedScore} 分</b></span>
+                    <span>自动分配：<b className="text-slate-900">{scoreNotice.exam.score_summary.autoScore} 分</b></span>
+                    <span>自动配分题目：<b className="text-slate-900">{scoreNotice.exam.score_summary.autoQuestionCount} 道</b></span>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500">本题为文本导入，未生成配分摘要。</p>
+                )}
+                {(scoreNotice.exam.score_summary?.warnings?.length || 0) > 0 && (
+                  <ul className="space-y-0.5 text-[11px] text-amber-700">
+                    {scoreNotice.exam.score_summary?.warnings.map((warning, index) => (
+                      <li key={index} className="flex items-start gap-1">
+                        <AlertCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                        <span>{warning}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {scoreNotice.exam.score_summary?.conflict && (
+                <button
+                  onClick={() => handleReassignScore(scoreNotice.exam, "full")}
+                  disabled={reassigningExamId === scoreNotice.exam.id}
+                  className="px-3 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition disabled:bg-slate-300"
+                >
+                  按配置总分重新自动配分
+                </button>
+              )}
+              <button
+                onClick={() => setScoreNotice(null)}
+                aria-label="关闭配分提示"
+                className="w-6 h-6 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center font-bold"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Banner & Header */}
       <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="space-y-1">
@@ -704,11 +800,32 @@ export const ExamManagementTab: React.FC<ExamManagementTabProps> = ({
                                     </div>
                                   ))}
                                 </div>
-                                <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400 font-semibold">
-                                  <span>试卷满分</span>
-                                  <span className="text-amber-300 font-bold font-mono text-sm">
-                                    {exam.total_score} 分
-                                  </span>
+                                <div className="mt-2.5 pt-2 border-t border-slate-800 space-y-1.5 text-xs text-slate-400 font-semibold">
+                                  {exam.score_summary && (
+                                    <>
+                                      <div className="flex items-center justify-between">
+                                        <span>原卷明确分值</span>
+                                        <span className="text-slate-100 font-mono">{exam.score_summary.fixedScore} 分</span>
+                                      </div>
+                                      <div className="flex items-center justify-between">
+                                        <span>程序自动分配</span>
+                                        <span className="text-slate-100 font-mono">
+                                          {exam.score_summary.autoScore} 分 · {exam.score_summary.autoQuestionCount} 题
+                                        </span>
+                                      </div>
+                                    </>
+                                  )}
+                                  <div className="flex items-center justify-between">
+                                    <span>试卷满分</span>
+                                    <span className="text-amber-300 font-bold font-mono text-sm">
+                                      {exam.total_score} 分
+                                    </span>
+                                  </div>
+                                  {exam.score_summary && exam.total_score !== exam.score_summary.configuredTotalScore && (
+                                    <div className="text-[10px] text-amber-300/90 font-medium pt-0.5">
+                                      配置总分 {exam.score_summary.configuredTotalScore} 分，已按实际分值计算
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             )}
@@ -752,6 +869,15 @@ export const ExamManagementTab: React.FC<ExamManagementTabProps> = ({
                             className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition"
                           >
                             <BarChart3 className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
+                            onClick={() => handleReassignScore(exam)}
+                            disabled={reassigningExamId === exam.id}
+                            title="保留人工与原卷分值，重新按题型权重自动配分"
+                            className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition disabled:opacity-50"
+                          >
+                            <RefreshCw className={`w-3.5 h-3.5 ${reassigningExamId === exam.id ? "animate-spin" : ""}`} />
                           </button>
 
                           <button
@@ -1002,10 +1128,17 @@ export const ExamManagementTab: React.FC<ExamManagementTabProps> = ({
                     <input type="number" min="1" value={expectedQuestionCount} onChange={(event) => setExpectedQuestionCount(event.target.value)} placeholder="如 22" className="w-full rounded-lg border border-slate-200 bg-white p-2 text-xs" />
                   </div>
                   <div>
-                    <label className="mb-1 block text-[11px] font-bold text-slate-600">预计总分（可选）</label>
-                    <input type="number" min="1" step="0.5" value={expectedTotalScore} onChange={(event) => setExpectedTotalScore(event.target.value)} placeholder="如 100" className="w-full rounded-lg border border-slate-200 bg-white p-2 text-xs" />
+                    <label className="mb-1 block text-[11px] font-bold text-slate-600">试卷总分</label>
+                    <input type="number" min="1" step="0.5" value={expectedTotalScore} onChange={(event) => setExpectedTotalScore(event.target.value)} placeholder="默认 100" className="w-full rounded-lg border border-slate-200 bg-white p-2 text-xs" />
                   </div>
                 </div>
+
+                <p className="flex items-start gap-1.5 text-[11px] text-slate-500 leading-relaxed">
+                  <Info className="w-3.5 h-3.5 text-blue-500 flex-shrink-0 mt-0.5" />
+                  <span>
+                    原卷未标注分值时会由系统按题型权重自动配分，并保证题目分值合计严格等于试卷总分；留空默认按 100 分配置。原卷已明确标注的分值不会被覆盖。
+                  </span>
+                </p>
 
                 {importFeedback}
 

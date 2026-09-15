@@ -150,6 +150,33 @@ app.put("/api/exams/:examId/questions/:qId", (req, res) => {
   }
 });
 
+app.put("/api/exams/:examId/questions/:qId/score", (req, res) => {
+  try {
+    const updated = examService.updateQuestionScore(
+      req.params.examId,
+      req.params.qId,
+      Number(req.body.score)
+    );
+    res.json({ question: updated, exam: examService.getExamById(req.params.examId) });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// 重新自动配分（方案 25 / 27）：mode=keep-manual 保留人工与原卷分值；mode=full 仅保留人工分值
+app.post("/api/exams/:id/reassign-score", (req, res) => {
+  try {
+    const totalScore = Number(req.body?.totalScore);
+    const exam = examService.reassignPaperScore(req.params.id, {
+      totalScore: Number.isFinite(totalScore) && totalScore > 0 ? totalScore : undefined,
+      mode: req.body?.mode === "full" ? "full" : "keep-manual",
+    });
+    res.json(exam);
+  } catch (err: any) {
+    res.status(err.statusCode || 500).json({ error: err.message });
+  }
+});
+
 app.post("/api/exams/:id/audit", (req, res) => {
   try {
     const audited = examService.auditAndLockExam(req.params.id);
@@ -346,6 +373,7 @@ app.post("/api/exams/import", upload.array("files", 50), async (req, res) => {
       edition_year: req.body.edition_year,
       semester: req.body.semester,
       expectedQuestionCount: optionalNumber(req.body.expected_question_count),
+      totalScore: optionalNumber(req.body.total_score),
       expectedTotalScore: optionalNumber(req.body.expected_total_score),
     });
     res.status(201).json(result);

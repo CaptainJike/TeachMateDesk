@@ -48,10 +48,18 @@ export interface VisionAnswerAnalysis {
 export interface ExamQuestionObservation {
   questionNumber: number;
   subNumber?: string;
+  /** 所属大题标题，例如“四、计算题”，供题型权重归一化使用。 */
+  sectionTitle?: string;
   type: string;
+  /** AI 识别的细分题型，例如 oral_calculation / vertical_calculation。 */
+  subType?: string;
+  difficulty?: "easy" | "medium" | "hard";
   stem: string;
   options?: string[];
-  score: number;
+  /** 原卷明确标注的分值；未标注时必须是 null，禁止臆测。 */
+  score: number | null;
+  /** 分值来源：original=原卷明确写出；ai=从上下文推测；auto=程序自动；manual=教师手工。 */
+  scoreSource?: "original" | "ai" | "auto" | "manual" | null;
   correctAnswer: string;
   analysis: string;
   rubricSteps: Array<{ step_no: number; score: number; criteria: string; keywords: string[] }>;
@@ -99,14 +107,15 @@ JSON 格式：${JSON.stringify({
 
   public async analyzeExam(params: { images: RuntimeImage[]; title?: string }): Promise<ExamVisionAnalysis> {
     if (!params.images.length) throw new Error("未提供试卷原图");
-    const agent = this.createAgent(`你是 TeachMate 试卷管理 Agent。直接阅读试卷和参考答案图片，提取题目、题型、分值、标准答案和每题评分标准。
-输出严格 JSON，不要 Markdown。无法确认的题目、答案或分值必须标记 reviewRequired=true，绝不能臆测。`);
+    const agent = this.createAgent(systemPromptForExam());
     const prompt = `请分析这些试卷图片，按题号和小问建立可供教师复核的结构化试卷。每一个具有独立作答内容和独立分值的题目/小题必须输出一条 questions 记录，不能把同一大题下的（1）（2）合并；questionNumber 填所属大题号，subNumber 填完整层级编号（例如大题 5 下的第 1 大小题的两个问分别填 5.1.1、5.1.2）。如果只有一层小题，可填 1.1、1.2。不要把大题号重复拼接到已经完整的 subNumber 上。
+请尽可能识别试卷中原本存在的分数信息，包括：每道大题总分（如“每题2分，共20分”）、每道小题分值、“共X分”、括号中的分值（如“（5分）”）、题目末尾出现的分数。
+如果试卷中没有明确标注分数，不要自行猜测 score，score 返回 null 且 scoreSource 返回 null；只有原卷明确写出分值时 scoreSource 才填 "original"。
 ${params.title ? `教师提供的试卷名称：${params.title}\n` : ""}
 JSON 格式：${JSON.stringify({
       title: params.title || "",
       pages: [{ page: 1, rotation: 0, layout: "single_column", confidence: 0 }],
-      questions: [{ questionNumber: 1, subNumber: "", type: "single_choice", stem: "", options: [], score: 0, correctAnswer: "", analysis: "", rubricSteps: [{ step_no: 1, score: 0, criteria: "", keywords: [] }] }],
+      questions: [{ questionNumber: 1, subNumber: "", sectionTitle: "一、填空题", type: "fill_blank", subType: "", difficulty: "medium", stem: "", options: [], score: null, scoreSource: null, correctAnswer: "", analysis: "", rubricSteps: [{ step_no: 1, score: 0, criteria: "", keywords: [] }] }],
       reviewRequired: false,
       reviewReason: "",
     })}`;
@@ -127,7 +136,11 @@ function systemPromptForStudent(): string {
 }
 
 function systemPromptForExam(): string {
-  return `你是 TeachMate 试卷管理 Agent。直接阅读试卷和参考答案图片，提取题目、题型、分值、标准答案和每题评分标准。输出严格 JSON，不要 Markdown。无法确认的题目、答案或分值必须标记 reviewRequired=true，绝不能臆测。`;
+  return `你是 TeachMate 试卷管理 Agent。直接阅读试卷和参考答案图片，提取题目、题型、原卷已有分值、标准答案和每题评分标准。
+输出严格 JSON，不要 Markdown。无法确认的题目或答案必须标记 reviewRequired=true，绝不能臆测。
+关于分值：请优先识别试卷中真实出现的分数（大题信息行如“每题2分，共20分”、小题括号分值如“（5分）”、题目末尾分值、“共X分”）。
+如果原卷没有明确标注某题分值，score 必须返回 null、scoreSource 返回 null，不要凭经验猜测具体分数；分值由系统统一自动配分。
+如果原卷明确写出了分值，score 返回该分值且 scoreSource 返回 "original"；如果是你自己根据题型推断出来的分值，scoreSource 返回 "ai"。`;
 }
 
 function parseJson(raw: string): any {
@@ -202,10 +215,16 @@ function normalizeExamAnalysis(value: any, title?: string): ExamVisionAnalysis {
     questions: questions.map((question: any) => ({
       questionNumber: Number(question.questionNumber) || 0,
       subNumber: question.subNumber ? String(question.subNumber) : undefined,
+      sectionTitle: question.sectionTitle ? String(question.sectionTitle).trim() : undefined,
       type: String(question.type || "subjective_short"),
+      subType: question.subType ? String(question.subType).trim() : undefined,
+      difficulty: ["easy", "medium", "hard"].includes(String(question.difficulty))
+        ? (String(question.difficulty) as "easy" | "medium" | "hard")
+        : undefined,
       stem: String(question.stem || "").trim(),
       options: Array.isArray(question.options) ? question.options.map(String) : undefined,
-      score: Number(question.score) || 0,
+      score: normalizeOptionalScore(question.score),
+      scoreSource: normalizeScoreSource(question.scoreSource, question.score),
       correctAnswer: String(question.correctAnswer || "").trim(),
       analysis: String(question.analysis || "").trim(),
       rubricSteps: Array.isArray(question.rubricSteps) ? question.rubricSteps.map((step: any, index: number) => ({
@@ -218,6 +237,26 @@ function normalizeExamAnalysis(value: any, title?: string): ExamVisionAnalysis {
     reviewRequired: Boolean(value.reviewRequired) || questions.length === 0,
     reviewReason: String(value.reviewReason || (questions.length === 0 ? "未识别到题目" : "")).trim(),
   };
+}
+
+/** 未标注分值的题目必须保持 null，避免 AI 臆测分值被当作原卷分值保护起来。 */
+function normalizeOptionalScore(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : null;
+}
+
+function normalizeScoreSource(
+  value: unknown,
+  rawScore: unknown,
+): "original" | "ai" | "auto" | "manual" | null {
+  const score = normalizeOptionalScore(rawScore);
+  if (score === null) return null;
+  const source = String(value ?? "").trim().toLowerCase();
+  if (source === "original") return "original";
+  if (source === "ai") return "ai";
+  // 未声明来源但有具体分值：按 AI 推测处理，交由程序配分引擎重新校验
+  return "ai";
 }
 
 function normalizePages(value: any): VisionPageEvidence[] {

@@ -48,6 +48,49 @@ export interface ExamPaper {
   questions: Question[];
   vision_pages?: VisionPageEvidence[];
   import_review_required?: boolean;
+  /** 程序自动配分结果摘要（方案 29），用于向教师说明系统做了什么。 */
+  score_summary?: ScoreSummary;
+}
+
+/** 分值来源：manual > original > auto（方案 6）。 */
+export type ScoreSource = "original" | "ai" | "auto" | "manual";
+
+export interface ScoreSectionSummary {
+  sectionKey: string;
+  sectionTitle: string;
+  questionNumbers: number[];
+  count: number;
+  totalScore: number;
+  weightKeys: string[];
+}
+
+export interface ScoreTypeSummary {
+  key: string;
+  label: string;
+  count: number;
+  totalScore: number;
+}
+
+export interface ScoreConflict {
+  identifiedTotalScore: number;
+  configuredTotalScore: number;
+  message: string;
+}
+
+export interface ScoreSummary {
+  subject: string;
+  configuredTotalScore: number;
+  totalScore: number;
+  fixedScore: number;
+  autoScore: number;
+  fixedQuestionCount: number;
+  autoQuestionCount: number;
+  adjustedQuestionCount: number;
+  alignedToStep: boolean;
+  sections: ScoreSectionSummary[];
+  typeStats: ScoreTypeSummary[];
+  warnings: string[];
+  conflict?: ScoreConflict;
 }
 
 export interface Question {
@@ -60,6 +103,14 @@ export interface Question {
   stem_text: string;
   options?: string[];
   score_value: number;
+  /** 分值来源标记（方案 6）：原卷明确 / AI 推测 / 程序自动 / 教师手工。 */
+  score_source?: ScoreSource;
+  /** AI 识别的细分题型（方案 16），例如 oral_calculation。 */
+  sub_type?: string;
+  /** AI 难度辅助（方案 17），仅作辅助权重，不直接决定分数。 */
+  difficulty?: "easy" | "medium" | "hard";
+  /** 所属大题标题，例如“四、计算题”，用于题型归一化。 */
+  section_title?: string;
   standard_answer?: StandardAnswer;
 }
 
@@ -240,7 +291,8 @@ export class SqliteStore {
         vision_pages_json TEXT,
         import_review_required INTEGER DEFAULT 0,
         created_at TEXT NOT NULL,
-        questions_json TEXT
+        questions_json TEXT,
+        score_summary_json TEXT
       );
 
       CREATE TABLE IF NOT EXISTS submissions (
@@ -337,6 +389,9 @@ export class SqliteStore {
     } catch {}
     try {
       this.db.exec(`ALTER TABLE exams ADD COLUMN source_files_json TEXT`);
+    } catch {}
+    try {
+      this.db.exec(`ALTER TABLE exams ADD COLUMN score_summary_json TEXT`);
     } catch {}
     for (const column of ["vision_pages_json", "import_review_required"]) {
       try { this.db.exec(`ALTER TABLE exams ADD COLUMN ${column} ${column === "import_review_required" ? "INTEGER DEFAULT 0" : "TEXT"}`); } catch {}
@@ -447,6 +502,9 @@ export class SqliteStore {
           import_review_required: Boolean(row.import_review_required),
           created_at: row.created_at,
           questions,
+          score_summary: (() => {
+            try { return row.score_summary_json ? JSON.parse(row.score_summary_json) : undefined; } catch { return undefined; }
+          })(),
         };
         this.exams.set(exam.id, exam);
       });
@@ -644,8 +702,8 @@ export class SqliteStore {
       // 1. 同步 Exams
       const insertExam = this.db.prepare(`
         INSERT OR REPLACE INTO exams 
-        (id, title, subject, school_stage, grade, textbook_version, publisher, edition_year, semester, total_score, status, file_path, source_files_json, vision_pages_json, import_review_required, created_at, questions_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (id, title, subject, school_stage, grade, textbook_version, publisher, edition_year, semester, total_score, status, file_path, source_files_json, vision_pages_json, import_review_required, created_at, questions_json, score_summary_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       this.exams.forEach((exam) => {
@@ -666,7 +724,8 @@ export class SqliteStore {
           JSON.stringify(exam.vision_pages || []),
           exam.import_review_required ? 1 : 0,
           exam.created_at,
-          JSON.stringify(exam.questions || [])
+          JSON.stringify(exam.questions || []),
+          exam.score_summary ? JSON.stringify(exam.score_summary) : null
         );
       });
 

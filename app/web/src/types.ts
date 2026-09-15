@@ -15,6 +15,46 @@ export interface StandardAnswer {
   is_teacher_edited: boolean;
 }
 
+export type ScoreSource = "original" | "ai" | "auto" | "manual";
+
+export interface ScoreSectionSummary {
+  sectionKey: string;
+  sectionTitle: string;
+  questionNumbers: number[];
+  count: number;
+  totalScore: number;
+  weightKeys: string[];
+}
+
+export interface ScoreTypeSummary {
+  key: string;
+  label: string;
+  count: number;
+  totalScore: number;
+}
+
+export interface ScoreConflict {
+  identifiedTotalScore: number;
+  configuredTotalScore: number;
+  message: string;
+}
+
+export interface ScoreSummary {
+  subject: string;
+  configuredTotalScore: number;
+  totalScore: number;
+  fixedScore: number;
+  autoScore: number;
+  fixedQuestionCount: number;
+  autoQuestionCount: number;
+  adjustedQuestionCount: number;
+  alignedToStep: boolean;
+  sections: ScoreSectionSummary[];
+  typeStats: ScoreTypeSummary[];
+  warnings: string[];
+  conflict?: ScoreConflict;
+}
+
 export interface Question {
   id: string;
   version_id?: string;
@@ -25,6 +65,10 @@ export interface Question {
   stem_text: string;
   options?: string[];
   score_value: number;
+  score_source?: ScoreSource;
+  sub_type?: string;
+  difficulty?: "easy" | "medium" | "hard";
+  section_title?: string;
   standard_answer?: StandardAnswer;
 }
 
@@ -45,6 +89,7 @@ export interface ExamPaper {
   source_files?: string[];
   created_at: string;
   questions: Question[];
+  score_summary?: ScoreSummary;
 }
 
 export interface StepEvaluation {

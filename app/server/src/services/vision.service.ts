@@ -67,6 +67,9 @@ export class VisionService {
     edition_year?: string;
     semester?: string;
     expectedQuestionCount?: number;
+    /** 试卷总分：作为自动配分的目标总分，未填写时默认 100。 */
+    totalScore?: number;
+    /** 兼容旧字段：等价于 totalScore。 */
     expectedTotalScore?: number;
   }): Promise<{ exam: ExamPaper; pageCount: number; fileUrls: string[]; reviewRequired: boolean }> {
     if (!params.files.length) throw new Error("请至少上传一张试卷图片");
@@ -76,10 +79,12 @@ export class VisionService {
     if (params.expectedQuestionCount !== undefined && analysis.questions.length !== params.expectedQuestionCount) {
       throw new Error(`题目数量校验失败：期望 ${params.expectedQuestionCount}，识别到 ${analysis.questions.length}，请先复核`);
     }
-    const totalScore = analysis.questions.reduce((sum, q) => sum + q.score, 0);
-    if (params.expectedTotalScore !== undefined && Math.abs(totalScore - params.expectedTotalScore) > 0.01) {
-      throw new Error(`总分校验失败：期望 ${params.expectedTotalScore}，识别到 ${totalScore}，请先复核`);
-    }
+    // 总分不再作为硬校验：未标注分值的试卷由程序配分引擎按题型权重补齐并强制对齐总分。
+    const requestedTotalScore = Number(params.totalScore) > 0
+      ? Number(params.totalScore)
+      : Number(params.expectedTotalScore) > 0
+        ? Number(params.expectedTotalScore)
+        : undefined;
     const exam = await this.examService.createExamFromVision({
       title: analysis.title,
       subject: params.subject,
@@ -93,6 +98,7 @@ export class VisionService {
       observations: analysis.questions,
       visionPages: analysis.pages,
       reviewRequired: analysis.reviewRequired,
+      totalScore: requestedTotalScore,
     });
     return {
       exam,
