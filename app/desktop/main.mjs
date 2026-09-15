@@ -49,7 +49,10 @@ async function startBackend() {
   if (localServer && backendUrl) return backendUrl;
   configureRuntimePaths();
   const serverEntry = app.isPackaged
-    ? path.join(process.resourcesPath, "app.asar", "server", "dist", "main.js")
+    // Workspace packages are stored under node_modules in the asar archive.
+    // The previous path pointed to `app.asar/server/...`, which is not a
+    // directory electron-builder creates for workspace dependencies.
+    ? path.join(__dirname, "node_modules", "@teachmate", "server", "dist", "main.js")
     : path.resolve(__dirname, "..", "server", "dist", "main.js");
   const { startServer } = await import(pathToFileURL(serverEntry).href);
   localServer = startServer(0);
