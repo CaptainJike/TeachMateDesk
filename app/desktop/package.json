@@ -24,7 +24,7 @@
     "asar": true,
     "files": [
       "main.mjs",
-      "preload.mjs",
+      "preload.cjs",
       "bin/**/*",
       "config.example.env",
       "package.json",

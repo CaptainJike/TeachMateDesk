@@ -18,6 +18,9 @@ interface NavbarProps {
   selectedExamId?: string;
   exams?: Array<{ id: string; title: string; questions: any[]; total_score: number; status: string }>;
   onSelectExam?: (exam: any) => void;
+  onOpenModelConfig?: () => void;
+  modelConfigured?: boolean;
+  modelProvider?: string;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -27,6 +30,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   selectedExamId,
   exams = [],
   onSelectExam,
+  onOpenModelConfig,
+  modelConfigured = false,
+  modelProvider = "",
 }) => {
   const navItems = [
     { id: "exams", label: "试卷管理", icon: FolderKanban, tag: "题库" },
@@ -101,10 +107,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           </nav>
 
           {/* Model Status Badge */}
-          <div className="hidden lg:flex items-center gap-1.5 text-xs text-slate-600 bg-emerald-50/80 px-2.5 py-1.5 rounded-full border border-emerald-200/70 flex-shrink-0">
-            <Cpu className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
-            <span className="font-semibold text-emerald-800 text-[11px]">Agent池就绪</span>
-          </div>
+          <button onClick={onOpenModelConfig} title={modelConfigured ? `模型服务商：${modelProvider || "未知"}` : "尚未配置 AI 模型，点击配置"} className={`hidden lg:flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full border flex-shrink-0 transition-colors cursor-pointer ${modelConfigured ? "text-emerald-600 bg-emerald-50/80 border-emerald-200/70 hover:bg-emerald-100" : "text-red-600 bg-red-50 border-red-200 hover:bg-red-100"}`}>
+            <Cpu className={`w-3.5 h-3.5 ${modelConfigured ? "text-emerald-600 animate-pulse" : "text-red-500"}`} />
+            <span className={`font-semibold text-[11px] ${modelConfigured ? "text-emerald-800" : "text-red-700"}`}>Agent池就绪 · {modelConfigured ? "已配置" : "未配置"}</span>
+          </button>
         </div>
       </div>
     </header>

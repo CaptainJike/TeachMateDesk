@@ -7,6 +7,7 @@ import { StudentReportTab } from "./components/StudentReportTab.js";
 import { StudentRevisionTab } from "./components/StudentRevisionTab.js";
 import { AnalyticsTab } from "./components/AnalyticsTab.js";
 import type { ExamPaper, StudentSubmission } from "./types.js";
+import { ModelConfigDialog } from "./components/ModelConfigDialog.js";
 
 export function App() {
   const [activeTab, setActiveTab] = useState("exams");
@@ -15,6 +16,23 @@ export function App() {
   const [submissions, setSubmissions] = useState<StudentSubmission[]>([]);
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string>("");
   const [selectedRevisionDetailId, setSelectedRevisionDetailId] = useState<string>("");
+  const [modelConfigOpen, setModelConfigOpen] = useState(false);
+  const [modelConfigured, setModelConfigured] = useState(false);
+  const [modelProvider, setModelProvider] = useState("");
+  const [saveNotice, setSaveNotice] = useState("");
+
+  const fetchModelConfig = async () => {
+    const teachmate = (window as Window & { teachmate?: { getModelConfig?: () => Promise<{ provider: string; keyConfigured: boolean }> } }).teachmate;
+    try {
+      const config = await teachmate?.getModelConfig?.();
+      if (config) {
+        setModelConfigured(Boolean(config.keyConfigured));
+        setModelProvider(config.provider || "");
+      }
+    } catch (error) {
+      console.error("Failed to fetch model config:", error);
+    }
+  };
 
   const fetchExams = async () => {
     try {
@@ -58,6 +76,12 @@ export function App() {
   useEffect(() => {
     fetchExams();
     fetchSubmissions();
+    fetchModelConfig();
+  }, []);
+
+  useEffect(() => {
+    const teachmate = (window as Window & { teachmate?: { onOpenModelConfig?: (callback: () => void) => () => void } }).teachmate;
+    return teachmate?.onOpenModelConfig?.(() => setModelConfigOpen(true));
   }, []);
 
   const handleSelectSubmissionFromBatch = (id: string) => {
@@ -80,7 +104,13 @@ export function App() {
         selectedExamId={selectedExam?.id}
         exams={exams}
         onSelectExam={setSelectedExam}
+        onOpenModelConfig={() => setModelConfigOpen(true)}
+        modelConfigured={modelConfigured}
+        modelProvider={modelProvider}
       />
+
+      {modelConfigOpen && <ModelConfigDialog onClose={() => setModelConfigOpen(false)} onSaved={() => { void fetchModelConfig(); setSaveNotice("配置保存成功"); window.setTimeout(() => setSaveNotice(""), 2500); }} />}
+      {saveNotice && <div className="fixed right-6 top-20 z-[110] rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-lg">{saveNotice}</div>}
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
